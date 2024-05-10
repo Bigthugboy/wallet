@@ -2,6 +2,7 @@ package db
 
 import (
 	"github.com/Bigthugboy/wallet/pkg/config"
+	"github.com/Bigthugboy/wallet/pkg/internal"
 
 	"github.com/jinzhu/gorm"
 )

@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/Bigthugboy/wallet/pkg/models"
 )
 
 const (
@@ -13,7 +15,12 @@ const (
 	KeycloakClientSecret = "YOUR_CLIENT_SECRET"
 )
 
-func RegisterUser(user User) error {
+type UserDetails struct {
+	user *models.User
+}
+
+func RegisterUser() error {
+
 	data := url.Values{}
 	data.Set("username", user.Username)
 	data.Set("email", user.Email)

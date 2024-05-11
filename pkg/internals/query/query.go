@@ -72,14 +72,11 @@ func (wa *WalletDB) GetTransactionWithID(userID, transactionID string) (models.T
 		return models.Transaction{}, fmt.Errorf("failed to find user: %v", err)
 	}
 	var transaction models.Transaction
-	if err := wa.DB.Where("id = ?", transactionID).First(&transaction).Error; err != nil {
+	if err := wa.DB.Where("id = ? AND wallet_id = ?", transactionID, user.Wallet.ID).First(&transaction).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
-			return models.Transaction{}, fmt.Errorf("transaction not found with ID %d", transactionID)
+			return models.Transaction{}, fmt.Errorf("transaction not found with ID %s", transactionID)
 		}
 		return models.Transaction{}, fmt.Errorf("failed to get transaction: %v", err)
-	}
-	if transaction.WalletID != user.Wallet.ID {
-		return models.Transaction{}, fmt.Errorf("transaction with ID %d does not belong to user with ID %d", transactionID, userID)
 	}
 	return transaction, nil
 }

@@ -8,5 +8,5 @@ type DBStore interface {
 	GetUserByID(userId string) (models.User, error)
 	CreateWallet(User *models.User) error
 	GetAllTransactions(userId uint) ([]models.Transaction, error)
-	GetTransactionWithID(userID, transactionID uint) (models.Transaction, error)
+	GetTransactionWithID(userID, transactionID string) (models.Transaction, error)
 }

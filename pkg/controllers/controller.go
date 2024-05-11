@@ -1,4 +1,4 @@
-package controller
+package controllers
 
 import (
 	"bytes"
@@ -13,6 +13,8 @@ import (
 	"strings"
 
 	"github.com/Bigthugboy/wallet/pkg/config"
+	"github.com/Bigthugboy/wallet/pkg/internals"
+	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 
 	"github.com/Bigthugboy/wallet/pkg/internals/repo"
@@ -20,13 +22,20 @@ import (
 	"github.com/go-playground/validator"
 )
 
+var secretKey = os.Getenv("SECRECT_KEY")
+var apiKey = os.Getenv("API_KEY")
+
 type Wallet struct {
 	App *config.AppTools
 	DB  repo.DBStore
 }
 
-var secretKey = os.Getenv("SECRECT_KEY")
-var apiKey = os.Getenv("API_KEY")
+func NewWallet(app *config.AppTools, db *gorm.DB) internals.Service {
+	return &Wallet{
+		App: app,
+		DB:  repo.NewWalletDB(app, db),
+	}
+}
 
 func (wa *Wallet) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -165,7 +174,7 @@ func (wa *Wallet) ValidatePayment(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(validateResp)
 }
 
-func (wa *Wallet) TransactionHistory(w http.ResponseWriter, r http.Request) {
+func (wa *Wallet) TransactionHistory(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	//refactor after testing to use keyclock session to get userId
 	if err := r.ParseForm(); err != nil {
@@ -196,7 +205,10 @@ func (wa *Wallet) TransactionHistory(w http.ResponseWriter, r http.Request) {
 
 }
 
-func (wa *Wallet) GetTransactionWithID(w http.ResponseWriter, r http.Request, userID, transactionID uint) {
+func (wa *Wallet) GetTransactionWithID(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	userID := params["userID"]
+	transactionID := params["transactionID"]
 	// Retrieve the transaction from the database
 	transaction, err := wa.DB.GetTransactionWithID(userID, transactionID)
 	if err != nil {
@@ -220,9 +232,10 @@ func (wa *Wallet) GetTransactionWithID(w http.ResponseWriter, r http.Request, us
 
 }
 
-func (wa *Wallet) CheckBalance(w http.ResponseWriter, r http.Request, userID string) {
+func (wa *Wallet) CheckBalance(w http.ResponseWriter, r *http.Request) {
 	// Extract user ID from the request context or session
-
+	params := mux.Vars(r)
+	userID := params["userID"]
 	// Retrieve the user from the database
 	user, err := wa.DB.GetUserByID(userID)
 	if err != nil {

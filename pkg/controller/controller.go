@@ -3,7 +3,7 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
-	"io"
+
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -41,6 +41,12 @@ func (wa *Wallet) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// Create wallet for the user
+	if err := wa.DB.CreateWallet(&user); err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
 	track, err := wa.DB.InsertUser(user)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -60,106 +66,146 @@ func (wa *Wallet) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
 }
 
 func (wa *Wallet) MakePayment(w http.ResponseWriter, r *http.Request) {
-    paymentRequest := models.PaymentRequest{}
+	paymentRequest := models.PaymentRequest{}
+	err := json.NewDecoder(r.Body).Decode(&paymentRequest)
+	if err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		log.Println("Error decoding JSON:", err)
+		return
+	}
+	requestData := map[string]interface{}{
+		// Populate request payload according to Flutterwave's API documentation
+	}
+	requestDataBytes, err := json.Marshal(requestData)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Println("Error encoding JSON:", err)
+		return
+	}
+	client := &http.Client{}
+	req, err := http.NewRequest("POST", "https://api.flutterwave.com/v3/payments", strings.NewReader(string(requestDataBytes)))
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Println("Error creating request:", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer"+secretKey)
 
-    // Read and parse the request body
-    err := json.NewDecoder(r.Body).Decode(&paymentRequest)
-    if err != nil {
-        http.Error(w, "Bad request", http.StatusBadRequest)
-        log.Println("Error decoding JSON:", err)
-        return
-    }
+	resp, err := client.Do(req)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Println("Error making request:", err)
+		return
+	}
+	defer resp.Body.Close()
 
-    requestData := map[string]interface{}{
-        // Populate request payload according to Flutterwave's API documentation
-    }
-
-    requestDataBytes, err := json.Marshal(requestData)
-    if err != nil {
-        http.Error(w, "Internal server error", http.StatusInternalServerError)
-        log.Println("Error encoding JSON:", err)
-        return
-    }
-    client := &http.Client{}
-    req, err := http.NewRequest("POST", "https://api.flutterwave.com/v3/payments", strings.NewReader(string(requestDataBytes)))
-    if err != nil {
-        http.Error(w, "Internal server error", http.StatusInternalServerError)
-        log.Println("Error creating request:", err)
-        return
-    }
-    req.Header.Set("Content-Type", "application/json")
-    req.Header.Set("Authorization", "Bearer" +secretKey)
-
-    resp, err := client.Do(req)
-    if err != nil {
-        http.Error(w, "Internal server error", http.StatusInternalServerError)
-        log.Println("Error making request:", err)
-        return
-    }
-    defer resp.Body.Close()
-
-    responseBody, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-        http.Error(w, "Internal server error", http.StatusInternalServerError)
-        log.Println("Error reading response body:", err)
-        return
-    }
-    var paymentResponse models.PaymentResponse
-    err = json.Unmarshal(responseBody, &paymentResponse)
-    if err != nil {
-        http.Error(w, "Internal server error", http.StatusInternalServerError)
-        log.Println("Error decoding JSON response:", err)
-        return
-    }
-
-    // Handle successful payment response
-    // You may want to send the payment response back to the client or perform additional processing
-    fmt.Println("Payment response:", paymentResponse)
-    // Send the payment response back to the client
-    json.NewEncoder(w).Encode(paymentResponse)
+	responseBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Println("Error reading response body:", err)
+		return
+	}
+	var paymentResponse models.PaymentResponse
+	err = json.Unmarshal(responseBody, &paymentResponse)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Println("Error decoding JSON response:", err)
+		return
+	}
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Printf("Error saving payment to database %s", paymentResponse.Data.StatusCode)
+		return
+	}
+	fmt.Println("Payment response:", paymentResponse)
+	json.NewEncoder(w).Encode(paymentResponse)
 }
-func (wa *Wallet) ValidatePayment(w http.ResponseWriter, r *http.Request)  {
-	 
-		reference := r.Query("reference")
 
-		url := fmt.Sprintf("https://api.paystack.co/transaction/verify/%s", reference)
-		client := &http.Client{}
+func (wa *Wallet) ValidatePayment(w http.ResponseWriter, r *http.Request) {
+	reference := r.URL.Query().Get("reference")
+	url := fmt.Sprintf("https://api.flutterwave.com/v3/transactions/%s/verify", reference)
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+secretKey)
 
-		req, err := http.NewRequest("GET", url, nil)
-		if err != nil {
-			_ = http.Error(w, "bad request", http.StatusBadRequest)
-			return
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+secretKey)
-		resp, _ := client.Do(req)
+	resp, err := client.Do(req)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
 
-		validateResp := &models.ValidateResponse{}
-		defer func(Body io.ReadCloser) {
-			err := Body.Close()
-			if err != nil {
-				http.Error(w,http.StatusInternalServerError,"error": "Failed to close response body")
-				return
-			}
-		}(resp.Body)
-		err = ctx.ShouldBindJSON(&validateResp)
-		if err != nil {
-			http.Error(w,http.StatusInternalServerError,"error": "invalid response")
-			return
-		}
-		if resp.StatusCode != http.StatusOK {
-			http.Error(w,resp.StatusCode,"error": "Transaction not successful")
-			return
-		}
-
-		if validateResp.Data.Amount == " " {
-			http.Error(http.StatusBadRequest, "error": "Failed to parse amount")
-			return
-		}
+	if resp.StatusCode != http.StatusOK {
+		http.Error(w, "Transaction not successful", resp.StatusCode)
+		return
+	}
+	var validateResp models.ValidateResponse
+	err = json.NewDecoder(resp.Body).Decode(&validateResp)
+	if err != nil {
+		http.Error(w, "Invalid response", http.StatusInternalServerError)
+		return
 	}
 
+	if validateResp.Data.Amount == "" {
+		http.Error(w, "Failed to parse amount", http.StatusBadRequest)
+		return
+	}
+	// Process the validation response as needed
+	fmt.Println("Validation response:", validateResp)
+	// Optionally, you can send the validation response back to the client
+	json.NewEncoder(w).Encode(validateResp)
+}
 
+func (wa *Wallet) TransactionHistory(w http.ResponseWriter, r http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	//refactor after testing to use keyclock session to get userId
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		log.Println("Error parsing form:", err)
+		return
+	}
+	var user models.User
+	transactions, err := wa.DB.GetAllTransactions(user.ID)
+	if err != nil {
+		http.Error(w, "Error getting transaction from database:", http.StatusInternalServerError)
+		log.Printf("fail to get documents from database %v", err)
+		return
+	}
+	if len(transactions) == 0 {
+		w.WriteHeader(http.StatusOK)
+		log.Println("you have made any transaction yet")
+		return
+	}
+	res, err := json.Marshal(transactions)
+	if err != nil {
+		http.Error(w, "Error encoding transactions to JSON", http.StatusInternalServerError)
+		log.Printf("Failed to encode transactions to JSON: %v", err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write(res)
 
+}
+
+func (wa *Wallet) GetTransactionWithID(w http.ResponseWriter, r http.Request) {
+
+}
+
+func (wa *Wallet) CheckBalance(w http.ResponseWriter, r http.Request) {
+
+}
+
+func (wa *Wallet) GetExchangeRate(w http.ResponseWriter, r http.Request) {
+
+}
+func (wa *Wallet) CheckExchageRate(w http.ResponseWriter, r http.Request)

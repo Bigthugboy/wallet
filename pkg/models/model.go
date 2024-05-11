@@ -11,20 +11,30 @@ var db *gorm.DB
 
 type User struct {
 	gorm.Model
-	FirstName   string `gorm: ""json:"firstName"`
+	FirstName   string `json:"firstName"`
 	LastName    string `json:"lastName"`
-	Email       string `json:"email" Usuage:"required`
-	Password    string `json:"password" Usuage:"required`
-	PhoneNumber string `json:"phone" Usage:"required"`
+	Email       string `json:"email" gorm:"unique;not null"`
+	Password    string `json:"password" gorm:"not null"`
+	PhoneNumber string `json:"phone" gorm:"not null"`
+	Wallet      Wallet `json:"wallet" gorm:"foreignkey:UserID"`
 }
 
-type Payment struct {
+type Wallet struct {
 	gorm.Model
-	ID        uint
-	UserID    uint
-	Amount    float64
-	Timestamp string
+	UserID       uint
+	Balance      float64 `json:"balance" gorm:"default:0"`
+	Transactions []Transaction
 }
+
+type Transaction struct {
+	gorm.Model
+	WalletID  uint
+	Amount    float64   `json:"amount"`
+	Timestamp time.Time `json:"timestamp"`
+	Method    string    `json:"method"`
+	Type      string    `json:"type"`
+}
+
 type ExchangeRates struct {
 	USD float64 `json:"usd"`
 	EUR float64 `json:"eur"`
@@ -39,7 +49,7 @@ type PaymentRequest struct {
 	LastName    string    `json:"last_name" Usage:"required,alpha"`
 	DatePayed   time.Time `bson:"date_payed"`
 	PhoneNumber string    `bson:"phone" Usage:"required"`
-	Payment     Payment   `json:"payment"`
+	// Payment     Payment   `json:"payment"`
 }
 
 type PaymentResponse struct {

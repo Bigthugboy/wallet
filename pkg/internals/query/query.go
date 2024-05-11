@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Bigthugboy/wallet/pkg/config"
-	"github.com/Bigthugboy/wallet/pkg/internal/repo"
+	"github.com/Bigthugboy/wallet/pkg/internals/repo"
 
 	"github.com/Bigthugboy/wallet/pkg/models"
 	"github.com/jinzhu/gorm"
@@ -57,4 +57,44 @@ func (w *WalletDB) SearchUserByEmail(email string) (int64, string, error) {
 	}
 
 	return int64(user.ID), user.FirstName, nil
+}
+
+func (wa *WalletDB) CreateWallet(user *models.User) error {
+	wallet := &models.Wallet{UserID: user.ID}
+	if err := wa.DB.Create(&wallet).Error; err != nil {
+		return err
+	}
+	user.Wallet = *wallet
+	return nil
+}
+
+func (wa *WalletDB) GetAllTransactions(userID uint) ([]models.Transaction, error) {
+	var user models.User
+	if err := wa.DB.Preload("Wallet").First(&user, userID).Error; err != nil {
+		return nil, fmt.Errorf("failed to find user: %v", err)
+	}
+
+	var transactions []models.Transaction
+	if err := wa.DB.Model(&user.Wallet).Related(&transactions).Error; err != nil {
+		return nil, fmt.Errorf("failed to get transactions: %v", err)
+	}
+	return transactions, nil
+}
+
+func (wa *WalletDB) GetTransactionWithID(userID, transactionID uint) (models.Transaction, error) {
+	var user models.User
+	if err := wa.DB.Preload("Wallet").First(&user, userID).Error; err != nil {
+		return models.Transaction{}, fmt.Errorf("failed to find user: %v", err)
+	}
+	var transaction models.Transaction
+	if err := wa.DB.Where("id = ?", transactionID).First(&transaction).Error; err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			return models.Transaction{}, fmt.Errorf("transaction not found with ID %d", transactionID)
+		}
+		return models.Transaction{}, fmt.Errorf("failed to get transaction: %v", err)
+	}
+	if transaction.WalletID != user.Wallet.ID {
+		return models.Transaction{}, fmt.Errorf("transaction with ID %d does not belong to user with ID %d", transactionID, userID)
+	}
+	return transaction, nil
 }

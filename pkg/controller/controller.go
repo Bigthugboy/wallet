@@ -117,11 +117,7 @@ func (wa *Wallet) MakePayment(w http.ResponseWriter, r *http.Request) {
 		log.Println("Error decoding JSON response:", err)
 		return
 	}
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		log.Printf("Error saving payment to database %s", paymentResponse.Data.StatusCode)
-		return
-	}
+
 	fmt.Println("Payment response:", paymentResponse)
 	json.NewEncoder(w).Encode(paymentResponse)
 }
@@ -208,4 +204,6 @@ func (wa *Wallet) CheckBalance(w http.ResponseWriter, r http.Request) {
 func (wa *Wallet) GetExchangeRate(w http.ResponseWriter, r http.Request) {
 
 }
-func (wa *Wallet) CheckExchageRate(w http.ResponseWriter, r http.Request)
+func (wa *Wallet) CheckExchageRate(w http.ResponseWriter, r http.Request) {
+
+}

@@ -5,10 +5,12 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/BigthugBoy/wallet/pkg/models"
-	"github.com/Bigthugboy/wallet/internal"
 	"github.com/Bigthugboy/wallet/pkg/config"
-	"github.com/Bigthugboy/wallet/pkg/repo"
+	"github.com/Bigthugboy/wallet/pkg/internal"
+	"github.com/Bigthugboy/wallet/pkg/internal/repo"
+	"github.com/Bigthugboy/wallet/pkg/models"
+
+	"github.com/Bigthugboy/wallet/pkg/db"
 	"github.com/go-playground/validator"
 	"github.com/jinzhu/gorm"
 )
@@ -18,10 +20,10 @@ type Wallet struct {
 	DB  repo.DBStore
 }
 
-func NewWallet(app *config.AppTools, db *gorm.DB) internal.MainStore {
+func NewWallet(app *config.AppTools, database *gorm.DB) internal.MainStore {
 	return &Wallet{
 		App: app,
-		DB:  repo.NewTravasDB(app, db),
+		DB:  db.NewWalletDB(app, database),
 	}
 }
 
@@ -42,7 +44,7 @@ func (wa *Wallet) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	track, err := wa.DB.InsertCustomer(user)
+	track, err := wa.DB.InsertUser(user)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		log.Println("Error adding user to database:", err)

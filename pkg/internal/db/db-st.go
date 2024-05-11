@@ -2,7 +2,7 @@ package db
 
 import (
 	"github.com/Bigthugboy/wallet/pkg/config"
-	"github.com/Bigthugboy/wallet/pkg/internal"
+	"github.com/Bigthugboy/wallet/pkg/internal/repo"
 
 	"github.com/jinzhu/gorm"
 )
@@ -12,7 +12,7 @@ type wallet struct {
 	DB  *gorm.DB
 }
 
-func NewWallet(app *config.AppTools, db *gorm.DB) internal.mainstore {
+func NewWalletDB(app *config.AppTools, db *gorm.DB) repo.DBStore {
 	return &wallet{
 		App: app,
 		DB:  db,

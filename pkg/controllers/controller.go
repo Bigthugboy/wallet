@@ -1,8 +1,10 @@
 package controller
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 
 	"io/ioutil"
 	"log"
@@ -24,6 +26,7 @@ type Wallet struct {
 }
 
 var secretKey = os.Getenv("SECRECT_KEY")
+var apiKey = os.Getenv("API_KEY")
 
 func (wa *Wallet) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -78,10 +81,10 @@ func (wa *Wallet) MakePayment(w http.ResponseWriter, r *http.Request) {
 		log.Println("Error decoding JSON:", err)
 		return
 	}
-	requestData := map[string]interface{}{
-		// Populate request payload according to Flutterwave's API documentation
-	}
-	requestDataBytes, err := json.Marshal(requestData)
+	// requestData := map[string]interface{}{
+	// 	// Populate request payload according to Flutterwave's API documentation
+	// }
+	requestDataBytes, err := json.Marshal(paymentRequest)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		log.Println("Error encoding JSON:", err)
@@ -231,10 +234,42 @@ func (wa *Wallet) CheckBalance(w http.ResponseWriter, r http.Request, userID str
 	fmt.Fprintf(w, "Your balance is: %.2f", balance)
 
 }
-
-func (wa *Wallet) GetExchangeRate(w http.ResponseWriter, r http.Request) {
-
-}
-func (wa *Wallet) CheckExchageRate(w http.ResponseWriter, r http.Request) {
-
+func (wa *Wallet) GetExchangeRate(w http.ResponseWriter, r *http.Request) {
+	var exchangeData models.Data
+	if err := json.NewDecoder(r.Body).Decode(&exchangeData); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		log.Println("Error decoding JSON:", err)
+		return
+	}
+	requestDataBytes, err := json.Marshal(exchangeData)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Println("Error encoding JSON:", err)
+		return
+	}
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", "https://api.exchangeratesapi.net/v1/exchange-rates/latest", bytes.NewReader(requestDataBytes))
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Println("Error creating request:", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	resp, err := client.Do(req)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Println("Error making request:", err)
+		return
+	}
+	defer resp.Body.Close()
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Println("Error reading response body:", err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	w.Write(responseBody)
 }

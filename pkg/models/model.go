@@ -78,6 +78,14 @@ type ValidateResponse struct {
 	Data    ResponseData `json:"data"`
 }
 
+type Data struct {
+	Base          string `json:"base"`
+	To            string `json:"to"`
+	From          string `json:"from"`
+	Date          string `json:"date"`
+	Currency_code string `json:"curreny_code"`
+}
+
 func init() {
 	middeware.Connect()
 	db = middeware.GetDB()

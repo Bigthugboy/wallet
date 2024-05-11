@@ -98,3 +98,18 @@ func (wa *WalletDB) GetTransactionWithID(userID, transactionID uint) (models.Tra
 	}
 	return transaction, nil
 }
+
+func (w *WalletDB) GetUserByID(userId string) (models.User, error) {
+	user := models.User{}
+	if w.DB == nil {
+		return user, fmt.Errorf("database connection is not initialized")
+	}
+	if err := w.DB.Where("ID = ?", userId).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return user, fmt.Errorf("user not found with ID %s", userId)
+		}
+		return user, err
+	}
+
+	return user, nil
+}

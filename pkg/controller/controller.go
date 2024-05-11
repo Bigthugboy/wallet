@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/Bigthugboy/wallet/pkg/config"
+	"github.com/jinzhu/gorm"
 
 	"github.com/Bigthugboy/wallet/pkg/internals/repo"
 	"github.com/Bigthugboy/wallet/pkg/models"
@@ -156,9 +157,8 @@ func (wa *Wallet) ValidatePayment(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to parse amount", http.StatusBadRequest)
 		return
 	}
-	// Process the validation response as needed
+
 	fmt.Println("Validation response:", validateResp)
-	// Optionally, you can send the validation response back to the client
 	json.NewEncoder(w).Encode(validateResp)
 }
 
@@ -193,11 +193,42 @@ func (wa *Wallet) TransactionHistory(w http.ResponseWriter, r http.Request) {
 
 }
 
-func (wa *Wallet) GetTransactionWithID(w http.ResponseWriter, r http.Request) {
+func (wa *Wallet) GetTransactionWithID(w http.ResponseWriter, r http.Request, userID, transactionID uint) {
+	// Retrieve the transaction from the database
+	transaction, err := wa.DB.GetTransactionWithID(userID, transactionID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			http.Error(w, "Transaction not found", http.StatusNotFound)
+		} else {
+			http.Error(w, "Error getting transaction", http.StatusInternalServerError)
+		}
+		log.Printf("Failed to get transaction: %v", err)
+		return
+	}
+	response, err := json.Marshal(transaction)
+	if err != nil {
+		http.Error(w, "Error encoding transaction to JSON", http.StatusInternalServerError)
+		log.Printf("Failed to encode transaction to JSON: %v", err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(response)
 
 }
 
-func (wa *Wallet) CheckBalance(w http.ResponseWriter, r http.Request) {
+func (wa *Wallet) CheckBalance(w http.ResponseWriter, r http.Request, userID string) {
+	// Extract user ID from the request context or session
+
+	// Retrieve the user from the database
+	user, err := wa.DB.GetUserByID(userID)
+	if err != nil {
+		http.Error(w, "Error getting user", http.StatusInternalServerError)
+		log.Printf("Failed to get user: %v", err)
+		return
+	}
+	balance := user.Wallet.Balance
+	fmt.Fprintf(w, "Your balance is: %.2f", balance)
 
 }
 

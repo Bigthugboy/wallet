@@ -17,6 +17,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 
+	"github.com/Bigthugboy/wallet/pkg/internals/query"
 	"github.com/Bigthugboy/wallet/pkg/internals/repo"
 	"github.com/Bigthugboy/wallet/pkg/models"
 	"github.com/go-playground/validator"
@@ -33,7 +34,7 @@ type Wallet struct {
 func NewWallet(app *config.AppTools, db *gorm.DB) internals.Service {
 	return &Wallet{
 		App: app,
-		DB:  repo.NewWalletDB(app, db),
+		DB:  query.NewWalletDB(app, db),
 	}
 }
 

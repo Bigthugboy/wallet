@@ -11,6 +11,7 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
+	github.com/anjolabassey/Rave-go v0.0.0-20220227000759-c0b94887bf0b // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 )
 

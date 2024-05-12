@@ -19,6 +19,7 @@ func main() {
 	gob.Register(models.User{})
 	gob.Register(models.Wallet{})
 	gob.Register(models.Transaction{})
+
 	app.InfoLogger.Println("*---------- Connecting to the wallet database --------")
 	app.InfoLogger.Println("*---------- Starting Wallet Web Server -----------*")
 	app.InfoLogger.Println("*---------- Connected to Wallet Web Server -----------*")
@@ -29,4 +30,5 @@ func main() {
 	route.HandleRoutes(r, srv)
 	http.Handle("/", r)
 	log.Fatal(http.ListenAndServe("localhost:9090", r))
+
 }

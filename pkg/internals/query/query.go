@@ -53,7 +53,7 @@ func (wa *WalletDB) CreateWallet(user *models.User) error {
 	return nil
 }
 
-func (wa *WalletDB) GetAllTransactions(userID uint) ([]models.Transaction, error) {
+func (wa *WalletDB) GetAllTransactions(userID string) ([]models.Transaction, error) {
 	var user models.User
 	if err := wa.DB.Preload("Wallet").First(&user, userID).Error; err != nil {
 		return nil, fmt.Errorf("failed to find user: %v", err)

@@ -1,6 +1,10 @@
 package middewares
 
 import (
+	"fmt"
+	"log"
+
+	"github.com/Bigthugboy/wallet/pkg/models"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 )
@@ -15,8 +19,17 @@ func Connect() {
 	if err != nil {
 		panic(err)
 	}
+
 	db = d
 }
+
 func GetDB() *gorm.DB {
 	return db
+}
+
+func dropTables(db *gorm.DB) {
+	if err := db.DropTableIfExists(&models.User{}, &models.Wallet{}, &models.Transaction{}).Error; err != nil {
+		log.Fatalf("Error dropping tables: %v", err)
+	}
+	fmt.Println("Tables dropped successfully")
 }

@@ -39,55 +39,37 @@ type ExchangeRates struct {
 	USD float64 `json:"usd"`
 	EUR float64 `json:"eur"`
 }
-
-type PaymentRequest struct {
-	Email       string    `json:"email"`
-	Amount      string    `json:"amount"`
-	SubAccount  string    `json:"subaccount"`
-	Currency    string    `json:"currency"`
-	FirstName   string    `json:"first_name" Usage:"required,alpha"`
-	LastName    string    `json:"last_name" Usage:"required,alpha"`
-	DatePayed   time.Time `bson:"date_payed"`
-	PhoneNumber string    `bson:"phone" Usage:"required"`
-	// Payment     Payment   `json:"payment"`
+type PayLoad struct {
+	FirstName   string  `json:"first_name" Usage:"required,alpha"`
+	LastName    string  `json:"last_name" Usage:"required,alpha"`
+	Amount      float64 `json:"amount"`
+	TxRef       string  `json:"tx_ref"`
+	Email       string  `json:"email"`
+	Phone       string  `json:"phone"`
+	Currency    string  `json:"currency"`
+	CardNo      string  `json:"card_no"`
+	Cvv         string  `json:"cvv"`
+	Pin         string  `json:"pin"`
+	ExpiryMonth string  `json:"expiry_month"`
+	ExpiryYear  string  `json:"expiry_year"`
 }
-
-type PaymentResponse struct {
-	Status  bool         `json:"status"`
-	Message string       `json:"message"`
-	Data    ResponseData `json:"data"`
-}
-
-type Authorizations struct {
-	AuthorizationCode string `json:"authorizationCode"`
-}
-
-type ResponseData struct {
-	AuthorizationUrl string         `json:"authorization_url"`
-	AccessCode       string         `json:"access_code"`
-	Reference        string         `json:"reference"`
-	Amount           string         `json:"amount"`
-	Status           bool           `json:"status"`
-	Authorization    Authorizations `json:"authorization"`
-	StatusCode       string         `json:"status_code"`
-}
-
-type ValidateResponse struct {
-	Status  bool         `json:"status"`
-	Message string       `json:"message"`
-	Data    ResponseData `json:"data"`
+type ValidatePayload struct {
+	Reference string `json:"transaction_reference"`
+	Otp       string `json:"otp"`
+	PublicKey string `json:"PBFPubKey"`
 }
 
 type Data struct {
-	Base          string `json:"base"`
-	To            string `json:"to"`
-	From          string `json:"from"`
-	Date          string `json:"date"`
-	Currency_code string `json:"curreny_code"`
+	Base         string `json:"base"`
+	To           string `json:"to"`
+	From         string `json:"from"`
+	Date         string `json:"date"`
+	CurrencyCode string `json:"curreny_code"`
 }
 
 func init() {
 	middeware.Connect()
 	db = middeware.GetDB()
 	db.AutoMigrate(&User{}, &Wallet{}, &Transaction{})
+
 }

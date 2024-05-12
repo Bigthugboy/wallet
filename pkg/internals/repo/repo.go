@@ -7,6 +7,6 @@ type DBStore interface {
 	SearchUserByEmail(email string) (int64, string, error)
 	GetUserByID(userId string) (models.User, error)
 	CreateWallet(User *models.User) error
-	GetAllTransactions(userId uint) ([]models.Transaction, error)
+	GetAllTransactions(userId string) ([]models.Transaction, error)
 	GetTransactionWithID(userID, transactionID string) (models.Transaction, error)
 }

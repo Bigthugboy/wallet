@@ -12,7 +12,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var app *config.AppTools
+var app = config.NewAppTools()
 
 func main() {
 	app.InfoLogger.Println("*---------- Connecting to the wallet database --------")
@@ -28,5 +28,5 @@ func main() {
 	r := mux.NewRouter()
 	route.HandleRoutes(r, srv)
 	http.Handle("/", r)
-	log.Fatal(http.ListenAndServe("Localhost:9090", r))
+	log.Fatal(http.ListenAndServe("localhost:9090", r))
 }

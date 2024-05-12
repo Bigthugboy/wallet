@@ -9,7 +9,10 @@ require (
 	golang.org/x/crypto v0.19.0
 )
 
-require gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
+require (
+	filippo.io/edwards25519 v1.1.0 // indirect
+	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
+)
 
 require (
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect

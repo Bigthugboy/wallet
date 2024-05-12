@@ -1,4 +1,4 @@
-package middeware
+package middewares
 
 import (
 	"github.com/jinzhu/gorm"

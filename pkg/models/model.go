@@ -3,7 +3,7 @@ package models
 import (
 	"time"
 
-	middeware "github.com/Bigthugboy/wallet/cmd/middleware"
+	middeware "github.com/Bigthugboy/wallet/cmd/middlewares"
 	"github.com/jinzhu/gorm"
 )
 

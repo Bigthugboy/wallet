@@ -89,5 +89,5 @@ type Data struct {
 func init() {
 	middeware.Connect()
 	db = middeware.GetDB()
-	db.AutoMigrate(&User{})
+	db.AutoMigrate(&User{}, &Wallet{}, &Transaction{})
 }

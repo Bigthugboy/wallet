@@ -1,14 +1,12 @@
 package controllers
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/Bigthugboy/wallet/pkg/config"
 	"github.com/Bigthugboy/wallet/pkg/internals"
@@ -21,14 +19,14 @@ import (
 	"github.com/Bigthugboy/wallet/pkg/models"
 )
 
-var secretKey = os.Getenv("PUBLIC_KEY")
-var apiKey = os.Getenv("API_KEY")
+var secretKey = "FLWSECK_TEST-7c8c2dcff4d2a9cb96fe3a34812e1e90-X"
+var apiKey = "joNy4QC92c72ri4K"
 
 var card = rave.Card{
 	Rave: rave.Rave{
 		Live:      false,
-		PublicKey: os.Getenv("RAVE_PUBKEY"),
-		SecretKey: os.Getenv("RAVE_SECKEY"),
+		PublicKey: "FLWPUBK_TEST-727132610f7bb0781b0343b0b0de55e7-X",
+		SecretKey: secretKey,
 	},
 }
 
@@ -79,6 +77,7 @@ func (wa *Wallet) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 func (wa *Wallet) MakePayment(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+
 	var payload models.PayLoad
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, "Bad request", http.StatusBadRequest)
@@ -108,6 +107,27 @@ func (wa *Wallet) MakePayment(w http.ResponseWriter, r *http.Request) {
 		log.Println("Error charging card:", err)
 		return
 	}
+	transaction := models.Transaction{
+		UserID:   userID,
+		Amount:   details.Amount,
+		Type:     details.Chargetype,
+		Currency: details.Currency,
+		Method:   "Card Payment",
+	}
+
+	_, err = wa.DB.SavePayment(transaction)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Println("Error saving payment:", err)
+		return
+	}
+	err = wa.DB.UpdateWalletBalance(userID, payload.Amount)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Println("Error updating wallet balance:", err)
+		return
+	}
+
 	// Write the response
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
@@ -216,67 +236,38 @@ func (wa *Wallet) CheckBalance(w http.ResponseWriter, r *http.Request) {
 
 }
 func (wa *Wallet) GetExchangeRate(w http.ResponseWriter, r *http.Request) {
-	// Parse required parameters from the request body
-	var exchangeData models.Data
-	if err := json.NewDecoder(r.Body).Decode(&exchangeData); err != nil {
-		http.Error(w, "Bad request", http.StatusBadRequest)
-		log.Println("Error decoding JSON:", err)
-		return
-	}
+	params := mux.Vars(r)
+	apikey := params["apikey"]
+	url := "https://api.exchangeratesapi.net/v1/exchange-rates/currency_codes "
 
-	// Retrieve API key from .env file
-	apiKey := os.Getenv("API_KEY")
-	if apiKey == "" {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		log.Println("API key not found")
-		return
-	}
+	req, _ := http.NewRequest("GET", url, nil)
 
-	// Prepare request payload
-	requestData := map[string]interface{}{
-		"base":          exchangeData.Base,
-		"to":            exchangeData.To,
-		"from":          exchangeData.From,
-		"date":          exchangeData.Date,
-		"currency_code": exchangeData.CurrencyCode,
-	}
-
-	// Convert payload to JSON
-	requestDataBytes, err := json.Marshal(requestData)
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		log.Println("Error encoding JSON:", err)
-		return
-	}
-
-	// Create HTTP client and make request
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", "https://api.exchangeratesapi.net/v1/exchange-rates/latest", bytes.NewReader(requestDataBytes))
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		log.Println("Error creating request:", err)
-		return
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-
-	resp, err := client.Do(req)
+	res, err := http.DefaultClient.Do(req)
+	req.Header.Set("Authorization", "Bearer "+apikey)
+	defer func() {
+		if res != nil && res.Body != nil {
+			res.Body.Close()
+		}
+	}()
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		log.Println("Error making request:", err)
 		return
 	}
-	defer resp.Body.Close()
 
-	// Read response body
-	responseBody, err := io.ReadAll(resp)
+	defer res.Body.Close()
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		log.Println("Error creating request", err)
+		log.Println("Error reading response body:", err)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(responseBody)
 
+	respondWithJSON(w, http.StatusOK, body)
+}
+
+func respondWithJSON(w http.ResponseWriter, status int, data []byte) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	w.Write(data)
 }

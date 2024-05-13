@@ -1,7 +1,8 @@
 package models
 
 import (
-	"time"
+	"fmt"
+	"log"
 
 	middeware "github.com/Bigthugboy/wallet/cmd/middlewares"
 	"github.com/jinzhu/gorm"
@@ -11,34 +12,47 @@ var db *gorm.DB
 
 type User struct {
 	gorm.Model
-	FirstName   string `json:"firstName"`
-	LastName    string `json:"lastName"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+
 	Email       string `json:"email" gorm:"unique;not null"`
 	Password    string `json:"password" gorm:"not null"`
 	PhoneNumber string `json:"phone" gorm:"not null"`
-	Wallet      Wallet `json:"wallet" gorm:"foreignkey:UserID"`
+	Wallet      Wallet `json:"wallet"`
+}
+type KLoginPayload struct {
+	clientId      string
+	email         string
+	password      string
+	grantType     string
+	client_secret string
+}
+type LoginUser struct {
+	email    string `json:"email" gorm:"unique;not null"`
+	password string `json:"password" gorm:"not null"`
+}
+type kLoginRes struct {
+	accessToken string `json:"acess_token"`
 }
 
 type Wallet struct {
 	gorm.Model
 	UserID       uint
-	Balance      float64 `json:"balance" gorm:"default:0"`
-	Transactions []Transaction
+	Balance      float64       `json:"balance" gorm:"-"`
+	Transactions []Transaction `json:"transactions"`
+	Currency     string        `json:"currency"`
 }
 
 type Transaction struct {
 	gorm.Model
-	WalletID  uint
-	Amount    float64   `json:"amount"`
-	Timestamp time.Time `json:"timestamp"`
-	Method    string    `json:"method"`
-	Type      string    `json:"type"`
+	UserID   uint
+	WalletID uint
+	Amount   float64 `json:"amount"`
+	Method   string  `json:"method"`
+	Type     string  `json:"type"`
+	Currency string  `json:"currency"`
 }
 
-type ExchangeRates struct {
-	USD float64 `json:"usd"`
-	EUR float64 `json:"eur"`
-}
 type PayLoad struct {
 	FirstName   string  `json:"first_name" Usage:"required,alpha"`
 	LastName    string  `json:"last_name" Usage:"required,alpha"`
@@ -47,14 +61,14 @@ type PayLoad struct {
 	Email       string  `json:"email"`
 	Phone       string  `json:"phone"`
 	Currency    string  `json:"currency"`
-	CardNo      string  `json:"card_no"`
+	CardNo      string  `json:"cardno"`
 	Cvv         string  `json:"cvv"`
 	Pin         string  `json:"pin"`
-	ExpiryMonth string  `json:"expiry_month"`
-	ExpiryYear  string  `json:"expiry_year"`
+	ExpiryMonth string  `json:"expirymonth"`
+	ExpiryYear  string  `json:"expiryyear"`
 }
 type ValidatePayload struct {
-	Reference string `json:"transaction_reference"`
+	Reference string `json:"tx_ref"`
 	Otp       string `json:"otp"`
 	PublicKey string `json:"PBFPubKey"`
 }
@@ -71,5 +85,13 @@ func init() {
 	middeware.Connect()
 	db = middeware.GetDB()
 	db.AutoMigrate(&User{}, &Wallet{}, &Transaction{})
+	db.Model(&Wallet{}).Association("Transactions")
 
+}
+
+func dropTables(db *gorm.DB) {
+	if err := db.DropTableIfExists(&User{}, &Wallet{}, &Transaction{}).Error; err != nil {
+		log.Fatalf("Error dropping tables: %v", err)
+	}
+	fmt.Println("Tables dropped successfully")
 }

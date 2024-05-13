@@ -95,3 +95,42 @@ func (w *WalletDB) GetUserByID(userId string) (models.User, error) {
 
 	return user, nil
 }
+func (w *WalletDB) SavePayment(transaction models.Transaction) (int64, error) {
+	result := w.DB.Create(&transaction)
+	if err := result.Error; err != nil {
+		return -1, err
+	}
+
+	return result.RowsAffected, nil
+}
+func (w *WalletDB) UpdateWalletBalance(userID uint, amount float64) error {
+	// Start a transaction
+	tx := w.DB.Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+	var wallet models.Wallet
+	if err := tx.Where("user_id = ?", userID).First(&wallet).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			tx.Rollback()
+			return err
+		}
+		tx.Rollback()
+		return err
+	}
+	newBalance := wallet.Balance + amount
+	if newBalance < 0 {
+		tx.Rollback()
+		return errors.New("insufficient funds")
+	}
+	wallet.Balance = newBalance
+	if err := tx.Save(&wallet).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+	if err := tx.Commit().Error; err != nil {
+		return err
+	}
+
+	return nil
+}

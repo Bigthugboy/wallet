@@ -12,6 +12,6 @@ var HandleRoutes = func(route *mux.Router, service internals.Service) {
 	route.HandleFunc("/getAll", service.TransactionHistory).Methods("GET")
 	route.HandleFunc("/transactions/{userID}/{transactionID}", service.GetTransactionWithID).Methods("GET")
 	route.HandleFunc("/balance/{userID}", service.CheckBalance).Methods("GET")
-	route.HandleFunc("/", service.GetExchangeRate).Methods("GET")
+	route.HandleFunc("/exchange-rate", service.GetExchangeRate).Methods("GET")
 
 }

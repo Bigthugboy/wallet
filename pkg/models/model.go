@@ -20,19 +20,24 @@ type User struct {
 	PhoneNumber string `json:"phone" gorm:"not null"`
 	Wallet      Wallet `json:"wallet"`
 }
+type UserInfo struct {
+	ID       uint64
+	Email    string
+	Password string
+}
 type KLoginPayload struct {
-	clientId      string
-	email         string
-	password      string
-	grantType     string
-	client_secret string
+	ClientId      string
+	Email         string
+	Password      string
+	GrantType     string
+	Client_secret string
 }
 type LoginUser struct {
-	email    string `json:"email" gorm:"unique;not null"`
-	password string `json:"password" gorm:"not null"`
+	Email    string `json:"email" gorm:"unique;not null"`
+	Password string `json:"password" gorm:"not null"`
 }
-type kLoginRes struct {
-	accessToken string `json:"acess_token"`
+type KLoginRes struct {
+	AccessToken string `json:"acess_token"`
 }
 
 type Wallet struct {

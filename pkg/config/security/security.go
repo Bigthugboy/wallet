@@ -12,23 +12,25 @@ import (
 )
 
 const (
-	KeycloakBaseURL      = "http://localhost:8080/auth/realms/YOUR_REALM"
-	KeycloakClientID     = "YOUR_CLIENT_ID"
-	KeycloakClientSecret = "YOUR_CLIENT_SECRET"
+	KeycloakBaseURL      = "http://localhost:8080/admin/realms/wallet"
+	KeycloakClientID     = "wallet-auth"
+	KeycloakClientSecret = "AsPw5x28Gph3xfopQL20UQywUtDfaX7r"
 )
 
 func RegisterUser(user *models.User) error {
 	data := url.Values{}
 	data.Set("email", user.Email)
 	data.Set("password", user.Password)
-	data.Set("enabled", "true")
+	data.Set("client_id", KeycloakClientID)
+	data.Add("grant_type", "password")
+	data.Add("scope", "offline_access")
+	data.Add("client_secret", KeycloakClientSecret)
 
-	req, err := http.NewRequest("POST", KeycloakBaseURL+"/users", strings.NewReader(data.Encode()))
+	req, err := http.NewRequest("POST", "http://localhost:8080/realms/wallet/protocol/openid-connect/token", strings.NewReader(data.Encode()))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.SetBasicAuth(KeycloakClientID, KeycloakClientSecret)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -44,31 +46,66 @@ func RegisterUser(user *models.User) error {
 	return nil
 }
 
-func LoginUser(login *models.KLoginPayload) (*models.kLoginRes, error) {
+func LoginUser(login *models.KLoginPayload) (*models.KLoginRes, error) {
+
 	formData := url.Values{
-		"clientId":      {login.ClientId},
-		"client_secret": {login.ClientSecret},
-		"grant_type":    {login.ClientId},
-		"username":      {login.ClientId},
-		"password":      {login.ClientId},
+		"client_id":     {KeycloakClientID},
+		"client_secret": {KeycloakClientSecret},
+		"grant_type":    {"password"},
+		"username":      {login.Email},
+		"password":      {login.Password},
 	}
-	encondedFormData := formData.Encode()
-	req, err := http.NewRequest("POST", KeycloakBaseURL+"/users", strings.NewReader(encondedFormData))
+	encodedFormData := formData.Encode()
+
+	req, err := http.NewRequest("POST", KeycloakBaseURL+"/protocol/openid-connect/token", strings.NewReader(encodedFormData))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		return errors.New("error connectiong to keylock login")
+		return nil, errors.New("failed to login user")
 	}
 
-	loginRes := &KloginRes{}
-	json.NewDecoder(resp.Body).Decode(loginRes)
-	return loginRes, nil
+	loginRes := &models.KLoginRes{}
+	err = json.NewDecoder(resp.Body).Decode(loginRes)
+	if err != nil {
+		return nil, err
+	}
 
+	return loginRes, nil
+}
+
+func ExtractUserInfo(accessToken string) (*models.UserInfo, error) {
+	req, err := http.NewRequest("GET", KeycloakBaseURL+"/protocol/openid-connect/userinfo", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("failed to extract user info")
+	}
+
+	userInfo := &models.UserInfo{}
+	err = json.NewDecoder(resp.Body).Decode(userInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	return userInfo, nil
 }

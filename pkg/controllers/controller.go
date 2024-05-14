@@ -9,9 +9,10 @@ import (
 	"net/http"
 
 	"github.com/Bigthugboy/wallet/pkg/config"
-	"github.com/Bigthugboy/wallet/pkg/config/security"
+	"github.com/Bigthugboy/wallet/pkg/config/security/jwtt"
 	"github.com/Bigthugboy/wallet/pkg/internals"
 	"github.com/anjolabassey/Rave-go/rave"
+
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 
@@ -21,8 +22,7 @@ import (
 )
 
 var secretKey = "FLWSECK_TEST-7c8c2dcff4d2a9cb96fe3a34812e1e90-X"
-var apiKey = "joNy4QC92c72ri4K"
-var clientSecret = " "
+
 var card = rave.Card{
 	Rave: rave.Rave{
 		Live:      false,
@@ -42,6 +42,7 @@ func NewWallet(app *config.AppTools, db *gorm.DB) internals.Service {
 		DB:  query.NewWalletDB(app, db),
 	}
 }
+
 func (wa *Wallet) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var user models.User
@@ -57,20 +58,13 @@ func (wa *Wallet) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := security.RegisterUser(&user)
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		log.Println("Error registering user with Keycloak:", err)
-		return
-	}
-
 	if err := wa.DB.CreateWallet(&user); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		log.Println("Error creating wallet for user:", err)
 		return
 	}
 
-	_, err = wa.DB.InsertUser(user)
+	_, err := wa.DB.InsertUser(user)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		log.Println("Error adding user to database:", err)
@@ -84,33 +78,44 @@ func (wa *Wallet) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		log.Println("Error encoding JSON:", err)
 		return
 	}
+	log.Println(response)
 }
 
 func (wa *Wallet) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	payload := new(models.LoginUser)
-	err := json.NewDecoder(r.Body).Decode(payload)
+
+	var payload models.LoginUser
+	err := json.NewDecoder(r.Body).Decode(&payload)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
-		log.Println("error decoding payload")
-	}
-	kLoginData := &models.KLoginPayload{
-		ClientId:      "wallet",
-		Email:         payload.Email,
-		Password:      payload.Password,
-		GrantType:     "password",
-		Client_secret: clientSecret,
-	}
-	res, err := security.LoginUser(kLoginData)
-	if err != nil {
-		w.WriteHeader(400)
-		w.Write([]byte(err.Error()))
+		log.Println("error decoding payload:", err)
 		return
 	}
-	w.WriteHeader(200)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(res)
 
+	// Search for user by email
+	userID, _, err := wa.DB.SearchUserByEmail(payload.Email)
+	if err != nil {
+		http.Error(w, "unregistered user", http.StatusUnauthorized)
+		log.Println("user not registered:", payload.Email)
+		return
+	}
+
+	walletToken, refWalletToken, err := jwtt.Generate(payload.Email, userID)
+	if err != nil {
+		http.Error(w, "failed to generate JWT tokens", http.StatusInternalServerError)
+		log.Println("error generating JWT tokens:", err)
+		return
+	}
+
+	response := map[string]string{
+		"wallet_token":     walletToken,
+		"ref_wallet_token": refWalletToken,
+	}
+	fmt.Printf("Token created: %s\n", walletToken)
+	fmt.Printf("Token created: %s\n", refWalletToken)
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
 }
 
 func (wa *Wallet) MakePayment(w http.ResponseWriter, r *http.Request) {

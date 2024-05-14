@@ -8,6 +8,7 @@ import (
 	middeware "github.com/Bigthugboy/wallet/cmd/middlewares"
 	"github.com/Bigthugboy/wallet/cmd/route"
 	"github.com/Bigthugboy/wallet/pkg/config"
+
 	"github.com/Bigthugboy/wallet/pkg/controllers"
 	"github.com/Bigthugboy/wallet/pkg/models"
 	"github.com/gorilla/mux"
@@ -26,9 +27,9 @@ func main() {
 	db := middeware.GetDB()
 
 	srv := controllers.NewWallet(app, db)
+
 	r := mux.NewRouter()
 	route.HandleRoutes(r, srv)
 	http.Handle("/", r)
 	log.Fatal(http.ListenAndServe("localhost:9090", r))
-
 }

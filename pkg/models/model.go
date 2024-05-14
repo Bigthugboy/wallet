@@ -21,23 +21,25 @@ type User struct {
 	Wallet      Wallet `json:"wallet"`
 }
 type UserInfo struct {
-	ID       uint64
+	ID       int64
 	Email    string
 	Password string
 }
 type KLoginPayload struct {
-	ClientId      string
-	Email         string
-	Password      string
-	GrantType     string
-	Client_secret string
+	ClientID     string
+	Username     string
+	Password     string
+	GrantType    string
+	ClientSecret string
 }
+
 type LoginUser struct {
-	Email    string `json:"email" gorm:"unique;not null"`
-	Password string `json:"password" gorm:"not null"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
+
 type KLoginRes struct {
-	AccessToken string `json:"acess_token"`
+	AccessToken string `json:"access_token"`
 }
 
 type Wallet struct {

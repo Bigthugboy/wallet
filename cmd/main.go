@@ -5,28 +5,35 @@ import (
 	"log"
 	"net/http"
 
-	middeware "github.com/Bigthugboy/wallet/cmd/middlewares"
 	"github.com/Bigthugboy/wallet/cmd/route"
-	"github.com/Bigthugboy/wallet/pkg/config"
+	"github.com/Bigthugboy/wallet/config"
+	"github.com/jinzhu/gorm"
 
-	"github.com/Bigthugboy/wallet/pkg/controllers"
-	"github.com/Bigthugboy/wallet/pkg/models"
+	"github.com/Bigthugboy/wallet/internals"
+	"github.com/Bigthugboy/wallet/internals/controllers"
 	"github.com/gorilla/mux"
 )
 
 var app = config.NewAppTools()
 
 func main() {
-	gob.Register(models.User{})
-	gob.Register(models.Wallet{})
-	gob.Register(models.Transaction{})
+	gob.Register(internals.User{})
+	gob.Register(internals.Wallet{})
+
+	dsn := "root:damilola@tcp(127.0.0.1:3306)/wallet?charset=utf8mb4&parseTime=True&loc=Local"
+	d, err := gorm.Open("mysql", dsn)
+	if err != nil {
+		panic(err)
+	}
+
+	d.AutoMigrate(&internals.User{}, &internals.Wallet{})
 
 	app.InfoLogger.Println("*---------- Connecting to the wallet database --------")
+
 	app.InfoLogger.Println("*---------- Starting Wallet Web Server -----------*")
 	app.InfoLogger.Println("*---------- Connected to Wallet Web Server -----------*")
-	db := middeware.GetDB()
 
-	srv := controllers.NewWallet(app, db)
+	srv := controllers.NewWallet(app, d)
 
 	r := mux.NewRouter()
 	route.HandleRoutes(r, srv)

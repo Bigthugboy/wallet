@@ -1,8 +1,8 @@
 package query
 
 import (
-	"github.com/Bigthugboy/wallet/pkg/config"
-	"github.com/Bigthugboy/wallet/pkg/internals/repo"
+	"github.com/Bigthugboy/wallet/config"
+	"github.com/Bigthugboy/wallet/internals/repo"
 
 	"github.com/jinzhu/gorm"
 )

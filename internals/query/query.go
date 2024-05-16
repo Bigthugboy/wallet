@@ -3,17 +3,18 @@ package query
 import (
 	"errors"
 	"fmt"
+	"log"
 
-	"github.com/Bigthugboy/wallet/pkg/models"
+	"github.com/Bigthugboy/wallet/internals"
 	"github.com/jinzhu/gorm"
 )
 
-func (w *WalletDB) InsertUser(user models.User) (int64, error) {
+func (w *WalletDB) InsertUser(user internals.User) (int64, error) {
 	if w.DB == nil {
 		return -1, fmt.Errorf("database connection is not initialized")
 	}
 
-	var existingUser models.User
+	var existingUser internals.User
 	if err := w.DB.Where("email = ?", user.Email).First(&existingUser).Error; err != nil && err != gorm.ErrRecordNotFound {
 		return -1, err
 	}
@@ -33,7 +34,7 @@ func (w *WalletDB) SearchUserByEmail(email string) (int64, string, error) {
 		return -1, "", fmt.Errorf("database connection is not initialized")
 	}
 
-	user := models.User{}
+	user := internals.User{}
 	if err := w.DB.Where("email = ?", email).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return -1, "", nil
@@ -44,8 +45,8 @@ func (w *WalletDB) SearchUserByEmail(email string) (int64, string, error) {
 	return int64(user.ID), user.FirstName, nil
 }
 
-func (wa *WalletDB) CreateWallet(user *models.User) error {
-	wallet := &models.Wallet{UserID: user.ID}
+func (wa *WalletDB) CreateWallet(user *internals.User) error {
+	wallet := &internals.Wallet{UserID: int(user.ID)}
 	if err := wa.DB.Create(&wallet).Error; err != nil {
 		return err
 	}
@@ -53,36 +54,35 @@ func (wa *WalletDB) CreateWallet(user *models.User) error {
 	return nil
 }
 
-func (wa *WalletDB) GetAllTransactions(userID string) ([]models.Transaction, error) {
-	var user models.User
+func (wa *WalletDB) GetAllTransactions(userID string) ([]internals.Wallet, error) {
+	var user internals.User
 	if err := wa.DB.Preload("Wallet").First(&user, userID).Error; err != nil {
 		return nil, fmt.Errorf("failed to find user: %v", err)
 	}
-
-	var transactions []models.Transaction
+	var transactions []internals.Wallet
 	if err := wa.DB.Model(&user.Wallet).Related(&transactions).Error; err != nil {
 		return nil, fmt.Errorf("failed to get transactions: %v", err)
 	}
 	return transactions, nil
 }
 
-func (wa *WalletDB) GetTransactionWithID(userID, transactionID string) (models.Transaction, error) {
-	var user models.User
+func (wa *WalletDB) GetTransactionWithID(userID, WalletID string) (internals.Wallet, error) {
+	var user internals.User
 	if err := wa.DB.Preload("Wallet").First(&user, userID).Error; err != nil {
-		return models.Transaction{}, fmt.Errorf("failed to find user: %v", err)
+		return internals.Wallet{}, fmt.Errorf("failed to find user: %v", err)
 	}
-	var transaction models.Transaction
-	if err := wa.DB.Where("id = ? AND wallet_id = ?", transactionID, user.Wallet.ID).First(&transaction).Error; err != nil {
+	var transaction internals.Wallet
+	if err := wa.DB.Where("id = ? ", WalletID).First(&transaction).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
-			return models.Transaction{}, fmt.Errorf("transaction not found with ID %s", transactionID)
+			return internals.Wallet{}, fmt.Errorf("transaction not found with ID %s", WalletID)
 		}
-		return models.Transaction{}, fmt.Errorf("failed to get transaction: %v", err)
+		return internals.Wallet{}, fmt.Errorf("failed to get transaction: %v", err)
 	}
 	return transaction, nil
 }
 
-func (w *WalletDB) GetUserByID(userId string) (models.User, error) {
-	user := models.User{}
+func (w *WalletDB) GetUserByID(userId string) (internals.User, error) {
+	user := internals.User{}
 	if w.DB == nil {
 		return user, fmt.Errorf("database connection is not initialized")
 	}
@@ -95,7 +95,7 @@ func (w *WalletDB) GetUserByID(userId string) (models.User, error) {
 
 	return user, nil
 }
-func (w *WalletDB) SavePayment(transaction models.Transaction) (int64, error) {
+func (w *WalletDB) SavePayment(transaction internals.Wallet) (int64, error) {
 	result := w.DB.Create(&transaction)
 	if err := result.Error; err != nil {
 		return -1, err
@@ -103,13 +103,14 @@ func (w *WalletDB) SavePayment(transaction models.Transaction) (int64, error) {
 
 	return result.RowsAffected, nil
 }
-func (w *WalletDB) UpdateWalletBalance(userID uint, amount float64) error {
+
+func (w *WalletDB) UpdateWalletBalance(userID int, amount float64) error {
 	// Start a transaction
 	tx := w.DB.Begin()
 	if tx.Error != nil {
 		return tx.Error
 	}
-	var wallet models.Wallet
+	var wallet internals.Wallet
 	if err := tx.Where("user_id = ?", userID).First(&wallet).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			tx.Rollback()
@@ -133,4 +134,19 @@ func (w *WalletDB) UpdateWalletBalance(userID uint, amount float64) error {
 	}
 
 	return nil
+}
+
+func (w *WalletDB) GetWalletBalance(userID, walletID string) (float64, error) {
+	var user internals.User
+	if err := w.DB.Preload("Wallet").First(&user, userID).Error; err != nil {
+		log.Println("Error retrieving user:", err)
+		return -1, err
+	}
+	var balance float64
+	// if user.Wallet == nil || user.Wallet.ID != walletID {
+	// 	log.Printf("Wallet not found for user %s with wallet ID %s", userID, walletID)
+	// 	return -1, errors.New("wallet not found")
+	// }
+	balance = user.Wallet.Balance
+	return balance, nil
 }

@@ -1,20 +1,13 @@
-package models
+package internals
 
 import (
-	"fmt"
-	"log"
-
-	middeware "github.com/Bigthugboy/wallet/cmd/middlewares"
 	"github.com/jinzhu/gorm"
 )
 
-var db *gorm.DB
-
 type User struct {
 	gorm.Model
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
-
+	FirstName   string `json:"firstName"`
+	LastName    string `json:"lastName"`
 	Email       string `json:"email" gorm:"unique;not null"`
 	Password    string `json:"password" gorm:"not null"`
 	PhoneNumber string `json:"phone" gorm:"not null"`
@@ -44,10 +37,11 @@ type KLoginRes struct {
 
 type Wallet struct {
 	gorm.Model
-	UserID       uint
-	Balance      float64       `json:"balance" gorm:"-"`
-	Transactions []Transaction `json:"transactions"`
-	Currency     string        `json:"currency"`
+	UserID   int
+	Balance  float64 `json:"balance" `
+	Currency string  `json:"currency"`
+	Method   string  `json:"method"`
+	Amount   float64 `json:"amount"`
 }
 
 type Transaction struct {
@@ -55,8 +49,6 @@ type Transaction struct {
 	UserID   uint
 	WalletID uint
 	Amount   float64 `json:"amount"`
-	Method   string  `json:"method"`
-	Type     string  `json:"type"`
 	Currency string  `json:"currency"`
 }
 
@@ -73,6 +65,7 @@ type PayLoad struct {
 	Pin         string  `json:"pin"`
 	ExpiryMonth string  `json:"expirymonth"`
 	ExpiryYear  string  `json:"expiryyear"`
+	UserID      int     `json:userId`
 }
 type ValidatePayload struct {
 	Reference string `json:"tx_ref"`
@@ -86,19 +79,4 @@ type Data struct {
 	From         string `json:"from"`
 	Date         string `json:"date"`
 	CurrencyCode string `json:"curreny_code"`
-}
-
-func init() {
-	middeware.Connect()
-	db = middeware.GetDB()
-	db.AutoMigrate(&User{}, &Wallet{}, &Transaction{})
-	db.Model(&Wallet{}).Association("Transactions")
-
-}
-
-func dropTables(db *gorm.DB) {
-	if err := db.DropTableIfExists(&User{}, &Wallet{}, &Transaction{}).Error; err != nil {
-		log.Fatalf("Error dropping tables: %v", err)
-	}
-	fmt.Println("Tables dropped successfully")
 }

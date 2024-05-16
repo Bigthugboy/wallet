@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/Bigthugboy/wallet/pkg/models"
+	"github.com/Bigthugboy/wallet/internals"
 )
 
 const (
@@ -17,8 +17,8 @@ const (
 )
 
 type AuthService interface {
-	Login(payload *models.KLoginPayload) (*models.KLoginRes, error)
-	ExtractUserInfo(accessToken string) (*models.UserInfo, error)
+	Login(payload *internals.KLoginPayload) (*internals.KLoginRes, error)
+	ExtractUserInfo(accessToken string) (*internals.UserInfo, error)
 }
 
 type Client struct {
@@ -33,7 +33,7 @@ func NewClient(httpClient *http.Client, keycloakBaseURL string) *Client {
 	}
 }
 
-func (c *Client) Login(payload *models.KLoginPayload) (*models.KLoginRes, error) {
+func (c *Client) Login(payload *internals.KLoginPayload) (*internals.KLoginRes, error) {
 	formData := url.Values{
 		"client_id":     {payload.ClientID},
 		"client_secret": {payload.ClientSecret},
@@ -59,7 +59,7 @@ func (c *Client) Login(payload *models.KLoginPayload) (*models.KLoginRes, error)
 		return nil, errors.New("failed to login user")
 	}
 
-	loginRes := &models.KLoginRes{}
+	loginRes := &internals.KLoginRes{}
 	err = json.NewDecoder(resp.Body).Decode(loginRes)
 	if err != nil {
 		return nil, err
@@ -68,7 +68,7 @@ func (c *Client) Login(payload *models.KLoginPayload) (*models.KLoginRes, error)
 	return loginRes, nil
 }
 
-func (c *Client) ExtractUserInfo(accessToken string) (*models.UserInfo, error) {
+func (c *Client) ExtractUserInfo(accessToken string) (*internals.UserInfo, error) {
 	req, err := http.NewRequest("GET", c.keycloakBaseURL+"/protocol/openid-connect/userinfo", nil)
 	if err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func (c *Client) ExtractUserInfo(accessToken string) (*models.UserInfo, error) {
 		return nil, errors.New("failed to extract user info")
 	}
 
-	userInfo := &models.UserInfo{}
+	userInfo := &internals.UserInfo{}
 	err = json.NewDecoder(resp.Body).Decode(userInfo)
 	if err != nil {
 		return nil, err

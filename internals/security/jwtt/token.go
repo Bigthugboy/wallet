@@ -2,10 +2,11 @@ package jwtt
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
-	"github.com/Bigthugboy/wallet/pkg/models"
+	"github.com/Bigthugboy/wallet/internals"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/sessions"
 )
@@ -48,17 +49,19 @@ func Generate(email string, id int64) (string, string, error) {
 }
 
 func Parse(tokenString string) (*WalletCliams, error) {
+	log.Print("+++++++++++++++++++++++++++++++++++++")
 	token, err := jwt.ParseWithClaims(tokenString, &WalletCliams{}, func(t *jwt.Token) (interface{}, error) {
 		return []byte(secretKey), nil
 	})
+	log.Print("----------------------")
 	if err != nil {
 		return nil, fmt.Errorf("error parsing token: %v", err)
 	}
-
+	log.Print("vvvvvvvvvvvvvvvvvvvvvvvvvvv")
 	if !token.Valid {
 		return nil, fmt.Errorf("invalid token")
 	}
-
+	log.Print("ccccccccccccccccccccccccccccccccccc")
 	claims, ok := token.Claims.(*WalletCliams)
 	if !ok {
 		return nil, fmt.Errorf("invalid token claims")
@@ -69,7 +72,7 @@ func Parse(tokenString string) (*WalletCliams, error) {
 
 // StoreSession stores session data in the cookie.
 func StoreSession(w http.ResponseWriter, r *http.Request, id int64, email, password string) error {
-	userInfo := &models.UserInfo{
+	userInfo := &internals.UserInfo{
 		ID:       id,
 		Email:    email,
 		Password: password,

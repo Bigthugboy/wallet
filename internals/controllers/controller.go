@@ -2,23 +2,24 @@ package controllers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 
 	"log"
 	"net/http"
 
-	"github.com/Bigthugboy/wallet/pkg/config"
-	"github.com/Bigthugboy/wallet/pkg/config/security/jwtt"
-	"github.com/Bigthugboy/wallet/pkg/internals"
+	"github.com/Bigthugboy/wallet/config"
+	"github.com/Bigthugboy/wallet/internals"
+
+	"github.com/Bigthugboy/wallet/internals/query"
+	"github.com/Bigthugboy/wallet/internals/repo"
+	"github.com/Bigthugboy/wallet/internals/security/jwtt"
 	"github.com/anjolabassey/Rave-go/rave"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
-
-	"github.com/Bigthugboy/wallet/pkg/internals/query"
-	"github.com/Bigthugboy/wallet/pkg/internals/repo"
-	"github.com/Bigthugboy/wallet/pkg/models"
 )
 
 var secretKey = "FLWSECK_TEST-7c8c2dcff4d2a9cb96fe3a34812e1e90-X"
@@ -43,34 +44,44 @@ func NewWallet(app *config.AppTools, db *gorm.DB) internals.Service {
 	}
 }
 
+func Encrypt(password string) (string, error) {
+	if password == "" {
+		return "", fmt.Errorf("no input value")
+	} else {
+		fromPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			return fmt.Sprint("cannot generate encrypted password"), err
+		}
+		hashedString := string(fromPassword)
+		return hashedString, nil
+	}
+}
+
 func (wa *Wallet) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	var user models.User
+	var user internals.User
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		log.Println("Error decoding form:", err)
 		return
 	}
-	user.Password, _ = config.Encrypt(user.Password)
+	user.Password, _ = Encrypt(user.Password)
 	if err := wa.App.Validate.Struct(&user); err != nil {
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		log.Println("Validation error:", err)
 		return
 	}
-
 	if err := wa.DB.CreateWallet(&user); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		log.Println("Error creating wallet for user:", err)
 		return
 	}
-
 	_, err := wa.DB.InsertUser(user)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		log.Println("Error adding user to database:", err)
 		return
 	}
-
 	response := map[string]string{"message": "Registered Successfully"}
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
@@ -82,16 +93,16 @@ func (wa *Wallet) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (wa *Wallet) LoginHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("========================================================")
 	w.Header().Set("Content-Type", "application/json")
 
-	var payload models.LoginUser
+	var payload internals.LoginUser
 	err := json.NewDecoder(r.Body).Decode(&payload)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		log.Println("error decoding payload:", err)
 		return
 	}
-
 	// Search for user by email
 	userID, _, err := wa.DB.SearchUserByEmail(payload.Email)
 	if err != nil {
@@ -121,16 +132,12 @@ func (wa *Wallet) LoginHandler(w http.ResponseWriter, r *http.Request) {
 func (wa *Wallet) MakePayment(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	var payload models.PayLoad
+	var payload internals.PayLoad
+	log.Println(payload)
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		log.Println("Error decoding payload:", err)
-		return
-	}
-
-	userInfo, ok := r.Context().Value("userInfo").(*models.UserInfo)
-	if !ok || userInfo == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		log.Println(payload)
 		return
 	}
 	details := rave.CardChargeData{
@@ -155,21 +162,21 @@ func (wa *Wallet) MakePayment(w http.ResponseWriter, r *http.Request) {
 		log.Println("Error charging card:", err)
 		return
 	}
-	transaction := models.Transaction{
-		UserID:   uint(userInfo.ID),
-		Amount:   details.Amount,
-		Type:     details.Chargetype,
+	transaction := internals.Wallet{
+		UserID:   payload.UserID,
+		Balance:  details.Amount,
 		Currency: details.Currency,
+		Amount:   details.Amount,
 		Method:   "Card Payment",
 	}
-
 	_, err = wa.DB.SavePayment(transaction)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		log.Println("Error saving payment:", err)
 		return
 	}
-	err = wa.DB.UpdateWalletBalance(uint(userInfo.ID), payload.Amount)
+	userID := payload.UserID
+	err = wa.DB.UpdateWalletBalance(userID, payload.Amount)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		log.Println("Error updating wallet balance:", err)
@@ -184,7 +191,7 @@ func (wa *Wallet) MakePayment(w http.ResponseWriter, r *http.Request) {
 
 func (wa *Wallet) ValidatePayment(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	var validatePayload models.ValidatePayload
+	var validatePayload internals.ValidatePayload
 	if err := json.NewDecoder(r.Body).Decode(&validatePayload); err != nil {
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		log.Println("Error decoding validation payload:", err)
@@ -212,7 +219,6 @@ func (wa *Wallet) ValidatePayment(w http.ResponseWriter, r *http.Request) {
 
 func (wa *Wallet) TransactionHistory(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	//refactor after testing to use keyclock session to get userId
 	params := mux.Vars(r)
 	userID := params["userID"]
 
@@ -266,53 +272,39 @@ func (wa *Wallet) GetTransactionWithID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (wa *Wallet) CheckBalance(w http.ResponseWriter, r *http.Request) {
-	// Extract user ID from the request context or session
+	log.Print("check if endpoint was hit")
 	params := mux.Vars(r)
 	userID := params["userID"]
-	// Retrieve the user from the database
-	user, err := wa.DB.GetUserByID(userID)
+	walletID := params["walletID"]
+
+	balance, err := wa.DB.GetWalletBalance(userID, walletID)
 	if err != nil {
-		http.Error(w, "Error getting user", http.StatusInternalServerError)
-		log.Printf("Failed to get user: %v", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Wallet not found", http.StatusNotFound)
+		} else {
+			http.Error(w, "Error getting wallet balance", http.StatusInternalServerError)
+		}
+		log.Printf("Failed to get wallet balance: %v", err)
 		return
 	}
-	balance := user.Wallet.Balance
+	log.Printf("log balance %v", balance)
 	fmt.Fprintf(w, "Your balance is: %.2f", balance)
-
 }
+
 func (wa *Wallet) GetExchangeRate(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	apikey := params["apikey"]
-	url := "https://api.exchangeratesapi.net/v1/exchange-rates/currency_codes "
+	url := "https://api.exchangeratesapi.net/v1/exchange-rates/currency_codes"
 
 	req, _ := http.NewRequest("GET", url, nil)
-
+	log.Println(req)
 	res, err := http.DefaultClient.Do(req)
-	req.Header.Set("Authorization", "Bearer "+apikey)
-	defer func() {
-		if res != nil && res.Body != nil {
-			res.Body.Close()
-		}
-	}()
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		log.Println("Error making request:", err)
-		return
+		http.Error(w, "error getting response", http.StatusInternalServerError)
+		log.Println("error getting response ", err)
 	}
 
 	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		log.Println("Error reading response body:", err)
-		return
-	}
+	body, _ := io.ReadAll(res.Body)
 
-	respondWithJSON(w, http.StatusOK, body)
-}
-
-func respondWithJSON(w http.ResponseWriter, status int, data []byte) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	w.Write(data)
+	fmt.Println(res)
+	fmt.Println(string(body))
 }
